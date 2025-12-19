@@ -10,61 +10,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Генерация вертикального текстового дождя
+      - name: Генерация текстовой сцены с перспективой
         run: |
-          echo ""
-          echo "==============================="
-          echo "    ТЕКСТОВЫЙ СНЕЖНЫЙ ДОЖДЬ"
-          echo "==============================="
-          echo ""
+          WIDTH=80
+          HEIGHT=45
 
-          # Наборы символов
-          SNOW="❄ ✼ ❅ ❆ ✻ ✽ ✵ ✶ ✷ ✸ ⁂ ❇"
-          SMALL="· ˑ ː ˘ ˙ ˚ ﾟ ҉ ҈ ❉ ⁎"
-          DROP="💧 💦 | ❘ ❙ ⁞ ː ı ֎"
-          SHINE="• ⋆ ✧ ✩ ✪ ⁕ ❂ ✿"
-          FRACTAL="✣ ✥ ❖ ✢ ✤ ✺ ❁ ❀"
+          # символы неба
+          SKY_SMALL="· ˑ ː ˘ ˙"
+          SKY_SNOW="❄ ✼ ❅ ✻"
+          SKY_SHINE="⋆ ✧ ✦"
 
-          WIDTH=40
-          HEIGHT=50
+          # типы дороги
+          ROAD_TYPES=("|" "│" ":" "░" "▒")
+          ROAD_SYMBOL=${ROAD_TYPES[$RANDOM % ${#ROAD_TYPES[@]}]}
 
-          for ((i=1; i<=HEIGHT; i++)); do
+          HORIZON_Y=$((HEIGHT / 3))
+
+          for ((y=1; y<=HEIGHT; y++)); do
               LINE=""
 
-              # коэффициент глубины (0..100)
-              DEPTH=$(( i * 100 / HEIGHT ))
+              ROAD_TOP=6
+              ROAD_BOTTOM=50
 
-              # перспектива: шире к низу
-              CUR_WIDTH=$(( WIDTH + DEPTH / 6 ))
-
-              # выбор слоя по глубине
-              if [ $DEPTH -lt 30 ]; then
-                  SET="$SMALL"
-                  DENSITY=8
-              elif [ $DEPTH -lt 60 ]; then
-                  SET="$SMALL $SNOW"
-                  DENSITY=5
-              elif [ $DEPTH -lt 85 ]; then
-                  SET="$SNOW $SHINE"
-                  DENSITY=3
+              if [ $y -gt $HORIZON_Y ]; then
+                  T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
+                  ROAD_WIDTH=$(( ROAD_TOP + (ROAD_BOTTOM - ROAD_TOP) * T / 100 ))
               else
-                  SET="$SNOW $DROP $FRACTAL"
-                  DENSITY=2
+                  ROAD_WIDTH=$ROAD_TOP
               fi
 
-              for ((j=1; j<=CUR_WIDTH; j++)); do
-                  if [ $((RANDOM % DENSITY)) -eq 0 ]; then
-                      SYMBOL=$(echo "$SET" | tr " " "\n" | shuf -n 1)
+              ROAD_LEFT=$(( (WIDTH - ROAD_WIDTH) / 2 ))
+              ROAD_RIGHT=$(( ROAD_LEFT + ROAD_WIDTH ))
 
-                      # капля в полёте (ближний план)
-                      if [ $DEPTH -gt 70 ] && [ $((RANDOM % 25)) -eq 0 ]; then
-                          SYMBOL=$(echo -e "⋰⋰💧\n⋱⋱💧\n︵︵💧" | shuf -n 1)
+              for ((x=1; x<=WIDTH; x++)); do
+
+                  if [ $y -eq $HORIZON_Y ]; then
+                      CHAR="─"
+
+                  elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
+                      if [ $x -eq $(( (ROAD_LEFT + ROAD_RIGHT) / 2 )) ] && [ $((y % 2)) -eq 0 ]; then
+                          CHAR="│"
+                      else
+                          CHAR="$ROAD_SYMBOL"
                       fi
+
                   else
-                      SYMBOL=" "
+                      R=$((RANDOM % 20))
+                      if [ $R -eq 0 ]; then
+                          CHAR=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
+                      elif [ $R -eq 1 ]; then
+                          CHAR=$(echo "$SKY_SHINE" | tr " " "\n" | shuf -n 1)
+                      else
+                          CHAR=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
+                      fi
                   fi
 
-                  LINE="$LINE$SYMBOL"
+                  LINE="$LINE$CHAR"
               done
 
               echo "$LINE"
