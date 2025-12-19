@@ -21,7 +21,7 @@ jobs:
           SKY_SHINE="⋆ ✧ ⭐️"
 
           # типы дороги
-          ROAD_TYPES=("|" "│" ":" "░" "▒")
+          ROAD_TYPES=("|" "│" ":" "░" "▒" "[]")
           ROAD_SYMBOL=${ROAD_TYPES[$RANDOM % ${#ROAD_TYPES[@]}]}
 
           HORIZON_Y=$((HEIGHT / 3))
