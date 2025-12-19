@@ -28,29 +28,51 @@ jobs:
           # Объединяем в общий набор
           ALL="$SNOW $SMALL $DROP $SHINE $FRACTAL"
 
-          # Количество столбцов (ширина)
-          WIDTH=40
-          # Количество строк (высота)
-          HEIGHT=50
+         WIDTH=40
+HEIGHT=50
 
-          for ((i=1; i<=$HEIGHT; i++)); do
-              LINE=""
-              for ((j=1; j<=$WIDTH; j++)); do
-                  # Берём случайный символ из списка
-                  SYMBOL=$(echo $ALL | tr " " "\n" | shuf -n 1)
+for ((i=1; i<=HEIGHT; i++)); do
+    LINE=""
 
-                  # 10% шанс заменить каплей "в полёте"
-                  if [ $((RANDOM % 40)) -eq 0 ]; then
-                    DROP_FLY=$(echo -e "⋰⋰⋰💧\n⋱⋱⋱💧\n︵︵︵💧" | shuf -n 1)
-                    SYMBOL="$DROP_FLY"
-                  fi
+    # коэффициент глубины (0.0 … 1.0)
+    DEPTH=$(( i * 100 / HEIGHT ))
 
-                  LINE="$LINE$SYMBOL"
-              done
-              echo "$LINE"
-              # маленькая пауза для эффекта
-              sleep 0.05
-          done
+    # чем ниже — тем шире сцена
+    CUR_WIDTH=$(( WIDTH + DEPTH / 6 ))
+
+    # выбор символов по глубине
+    if [ $DEPTH -lt 30 ]; then
+        SET="$SMALL"
+        DENSITY=8
+    elif [ $DEPTH -lt 60 ]; then
+        SET="$SMALL $SNOW"
+        DENSITY=5
+    elif [ $DEPTH -lt 85 ]; then
+        SET="$SNOW $SHINE"
+        DENSITY=3
+    else
+        SET="$SNOW $DROP $FRACTAL"
+        DENSITY=2
+    fi
+
+    for ((j=1; j<=CUR_WIDTH; j++)); do
+        if [ $((RANDOM % DENSITY)) -eq 0 ]; then
+            SYMBOL=$(echo $SET | tr " " "\n" | shuf -n 1)
+
+            # редкая капля "в полёте" — только ближе к камере
+            if [ $DEPTH -gt 70 ] && [ $((RANDOM % 25)) -eq 0 ]; then
+                SYMBOL=$(echo -e "⋰⋰💧\n⋱⋱💧\n︵︵💧" | shuf -n 1)
+            fi
+        else
+            SYMBOL=" "
+        fi
+
+        LINE="$LINE$SYMBOL"
+    done
+
+    echo "$LINE"
+    sleep 0.05
+done
 
           echo ""
           echo "=========  END  ==========="
