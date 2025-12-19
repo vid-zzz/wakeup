@@ -17,8 +17,8 @@ jobs:
 
           # символы неба
           SKY_SMALL="· ˑ ː ˘ ˙ 💧"
-          SKY_SNOW="❄ ✼ ❅ ✻"
-          SKY_SHINE="⋆ ✧ ✦"
+          SKY_SNOW="❄ ✼ ❅ ❄️"
+          SKY_SHINE="⋆ ✧ ⭐️"
 
           # типы дороги
           ROAD_TYPES=("|" "│" ":" "░" "▒")
@@ -71,6 +71,4 @@ jobs:
               echo "$LINE"
               sleep 0.05
           done
-
-          echo ""
-          echo "=========  END  =========="
+s
