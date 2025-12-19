@@ -1,4 +1,4 @@
-name: Text Snow Rain Matrix
+name: Text Snow Road With Trees
 
 on:
   schedule:
@@ -10,65 +10,140 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Генерация текстовой сцены с перспективой
+      - name: Render text scene
+        shell: bash
         run: |
           WIDTH=80
-          HEIGHT=20
+          HEIGHT=45
 
-          # символы неба
-          SKY_SMALL="· ˑ ː ˘ ˙ 💧"
-          SKY_SNOW="❄ ✼ ❅ ❄️"
-          SKY_SHINE="⋆ ✧ ⭐️"
+          # ===== СИМВОЛЫ НЕБА =====
+          SKY_SMALL="· ˑ ː ˘ ˙"
+          SKY_SNOW="❄ ✼ ❅ ✻"
+          SKY_SHINE="⋆ ✧ ✦"
 
-          # типы дороги
-          ROAD_TYPES=("|" "│" ":" "░" "▒" "[]" "<>" "{}" "|_|")
-          ROAD_SYMBOL=${ROAD_TYPES[$RANDOM % ${#ROAD_TYPES[@]}]}
+          # ===== СПРАЙТЫ ДЕРЕВА (LOD) =====
+          TREE_FAR=(
+            " ^ "
+          )
 
+          TREE_MID=(
+            " ^ "
+            "/|\\"
+          )
+
+          TREE_NEAR=(
+            "  ^  "
+            " /***\\ "
+            "/*****\\"
+            "   |   "
+          )
+
+          # ===== ЭКРАННЫЙ БУФЕР =====
+          declare -A SCREEN
+          for ((y=1; y<=HEIGHT; y++)); do
+            for ((x=1; x<=WIDTH; x++)); do
+              SCREEN[$y,$x]=" "
+            done
+          done
+
+          # ===== ФУНКЦИЯ РИСОВАНИЯ ОБЪЕКТОВ =====
+          draw_object() {
+            local sy=$1
+            local sx=$2
+            shift 2
+            local sprite=("$@")
+
+            for ((yy=0; yy<${#sprite[@]}; yy++)); do
+              row="${sprite[$yy]}"
+              for ((xx=0; xx<${#row}; xx++)); do
+                char="${row:$xx:1}"
+                if [ "$char" != " " ]; then
+                  py=$((sy + yy))
+                  px=$((sx + xx))
+                  if [ $py -ge 1 ] && [ $py -le $HEIGHT ] && \
+                     [ $px -ge 1 ] && [ $px -le $WIDTH ]; then
+                    SCREEN[$py,$px]="$char"
+                  fi
+                fi
+              done
+            done
+          }
+
+          # ===== ГОРИЗОНТ =====
           HORIZON_Y=$((HEIGHT / 3))
 
+          # ===== ОСНОВНАЯ СЦЕНА =====
           for ((y=1; y<=HEIGHT; y++)); do
-              LINE=""
 
-              ROAD_TOP=6
-              ROAD_BOTTOM=50
+            ROAD_TOP=6
+            ROAD_BOTTOM=50
 
-              if [ $y -gt $HORIZON_Y ]; then
-                  T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
-                  ROAD_WIDTH=$(( ROAD_TOP + (ROAD_BOTTOM - ROAD_TOP) * T / 100 ))
+            if [ $y -gt $HORIZON_Y ]; then
+              T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
+              ROAD_WIDTH=$(( ROAD_TOP + (ROAD_BOTTOM - ROAD_TOP) * T / 100 ))
+            else
+              ROAD_WIDTH=$ROAD_TOP
+            fi
+
+            ROAD_LEFT=$(( (WIDTH - ROAD_WIDTH) / 2 ))
+            ROAD_RIGHT=$(( ROAD_LEFT + ROAD_WIDTH ))
+            ROAD_CENTER=$(( (ROAD_LEFT + ROAD_RIGHT) / 2 ))
+
+            for ((x=1; x<=WIDTH; x++)); do
+
+              # --- ГОРИЗОНТ ---
+              if [ $y -eq $HORIZON_Y ]; then
+                CHAR="─"
+
+              # --- ДОРОГА ---
+              elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
+                if [ $x -eq $ROAD_CENTER ] && [ $((y % 2)) -eq 0 ]; then
+                  CHAR="│"
+                else
+                  CHAR="░"
+                fi
+
+              # --- НЕБО ---
               else
-                  ROAD_WIDTH=$ROAD_TOP
+                R=$((RANDOM % 20))
+                if [ $R -eq 0 ]; then
+                  CHAR=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
+                elif [ $R -eq 1 ]; then
+                  CHAR=$(echo "$SKY_SHINE" | tr " " "\n" | shuf -n 1)
+                else
+                  CHAR=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
+                fi
               fi
 
-              ROAD_LEFT=$(( (WIDTH - ROAD_WIDTH) / 2 ))
-              ROAD_RIGHT=$(( ROAD_LEFT + ROAD_WIDTH ))
+              SCREEN[$y,$x]="$CHAR"
+            done
 
-              for ((x=1; x<=WIDTH; x++)); do
+            # ===== ДЕРЕВЬЯ =====
+            if [ $y -gt $HORIZON_Y ] && [ $((RANDOM % 18)) -eq 0 ]; then
 
-                  if [ $y -eq $HORIZON_Y ]; then
-                      CHAR="─"
+              if [ $((RANDOM % 2)) -eq 0 ]; then
+                TX=$((ROAD_LEFT - 6))
+              else
+                TX=$((ROAD_RIGHT + 2))
+              fi
 
-                  elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
-                      if [ $x -eq $(( (ROAD_LEFT + ROAD_RIGHT) / 2 )) ] && [ $((y % 2)) -eq 0 ]; then
-                          CHAR="│"
-                      else
-                          CHAR="$ROAD_SYMBOL"
-                      fi
+              if [ $y -lt $((HORIZON_Y + 6)) ]; then
+                draw_object $y $TX "${TREE_FAR[@]}"
+              elif [ $y -lt $((HORIZON_Y + 16)) ]; then
+                draw_object $y $TX "${TREE_MID[@]}"
+              else
+                draw_object $y $TX "${TREE_NEAR[@]}"
+              fi
+            fi
+          done
 
-                  else
-                      R=$((RANDOM % 20))
-                      if [ $R -eq 0 ]; then
-                          CHAR=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
-                      elif [ $R -eq 1 ]; then
-                          CHAR=$(echo "$SKY_SHINE" | tr " " "\n" | shuf -n 1)
-                      else
-                          CHAR=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
-                      fi
-                  fi
-
-                  LINE="$LINE$CHAR"
-              done
-
-              echo "$LINE"
-              sleep 0.05
+          # ===== ВЫВОД =====
+          for ((y=1; y<=HEIGHT; y++)); do
+            LINE=""
+            for ((x=1; x<=WIDTH; x++)); do
+              LINE+="${SCREEN[$y,$x]}"
+            done
+            echo "$LINE"
+            sleep 0.05
           done
 
