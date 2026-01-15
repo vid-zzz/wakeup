@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           WIDTH=80
-          HEIGHT=45
+          HEIGHT=20
 
           # ===== НЕБО =====
           SKY_SMALL="· ˑ ː ˘ ˙"
