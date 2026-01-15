@@ -1,4 +1,4 @@
-name: Text Snow Road With Trees
+name: Text Snow Road With Perspective
 
 on:
   schedule:
@@ -6,39 +6,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate:
+  render:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Render text scene
+      - name: Render ASCII scene with real perspective
         shell: bash
         run: |
           WIDTH=80
-          HEIGHT=20
+          HEIGHT=45
 
-          # ===== СИМВОЛЫ НЕБА =====
+          # ===== НЕБО =====
           SKY_SMALL="· ˑ ː ˘ ˙"
-          SKY_SNOW="❄ ✼ ❅ ✻"
+          SKY_SNOW="❄ ✼ ❅"
           SKY_SHINE="⋆ ✧ ✦"
 
-          # ===== СПРАЙТЫ ДЕРЕВА (LOD) =====
+          # ===== ДЕРЕВЬЯ (LOD) =====
           TREE_FAR=(
             " ^ "
           )
 
           TREE_MID=(
-            " ^ "
-            "/|\\"
+            " /^\\ "
+            "  |  "
           )
 
           TREE_NEAR=(
-            "  ^  "
-            " /***\\ "
-            "/*****\\"
-            "   |   "
+            "   ###   "
+            "  #####  "
+            " ####### "
+            "    |    "
+            "    |    "
           )
 
-          # ===== ЭКРАННЫЙ БУФЕР =====
+          # ===== ЭКРАН =====
           declare -A SCREEN
           for ((y=1; y<=HEIGHT; y++)); do
             for ((x=1; x<=WIDTH; x++)); do
@@ -46,7 +47,6 @@ jobs:
             done
           done
 
-          # ===== ФУНКЦИЯ РИСОВАНИЯ ОБЪЕКТА =====
           draw_object() {
             local sy=$1
             local sx=$2
@@ -72,38 +72,11 @@ jobs:
           # ===== ГОРИЗОНТ =====
           HORIZON_Y=$((HEIGHT / 3))
 
-          # ===== РАЗМЕЩЕНИЕ ДЕРЕВЬЕВ (ОДИН РАЗ) =====
-          TREES_Y=()
-          TREES_X=()
-          TREES_LOD=()
-
-          for ((i=0; i<14; i++)); do
-            TY=$((HORIZON_Y + 2 + RANDOM % (HEIGHT - HORIZON_Y - 6)))
-
-            if [ $TY -lt $((HORIZON_Y + 6)) ]; then
-              LOD=0
-            elif [ $TY -lt $((HORIZON_Y + 16)) ]; then
-              LOD=1
-            else
-              LOD=2
-            fi
-
-            if [ $((RANDOM % 2)) -eq 0 ]; then
-              TX=$((WIDTH / 2 - 28))
-            else
-              TX=$((WIDTH / 2 + 22))
-            fi
-
-            TREES_Y+=($TY)
-            TREES_X+=($TX)
-            TREES_LOD+=($LOD)
-          done
-
-          # ===== РЕНДЕР НЕБА + ДОРОГИ =====
+          # ===== ДОРОГА + НЕБО =====
           for ((y=1; y<=HEIGHT; y++)); do
 
             ROAD_TOP=6
-            ROAD_BOTTOM=50
+            ROAD_BOTTOM=60
 
             if [ $y -gt $HORIZON_Y ]; then
               T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
@@ -129,7 +102,7 @@ jobs:
                 fi
 
               else
-                R=$((RANDOM % 20))
+                R=$((RANDOM % 18))
                 if [ $R -eq 0 ]; then
                   CHAR=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
                 elif [ $R -eq 1 ]; then
@@ -141,6 +114,35 @@ jobs:
 
               SCREEN[$y,$x]="$CHAR"
             done
+          done
+
+          # ===== ГЕНЕРАЦИЯ ДЕРЕВЬЕВ (ОДИН РАЗ) =====
+          TREES_Y=()
+          TREES_X=()
+          TREES_LOD=()
+
+          for ((i=0; i<14; i++)); do
+            TY=$((HORIZON_Y + 2 + RANDOM % (HEIGHT - HORIZON_Y - 8)))
+
+            if [ $TY -lt $((HORIZON_Y + 6)) ]; then
+              LOD=0
+            elif [ $TY -lt $((HORIZON_Y + 16)) ]; then
+              LOD=1
+            else
+              LOD=2
+            fi
+
+            OFFSET=$(( (TY - HORIZON_Y) * 28 / (HEIGHT - HORIZON_Y) ))
+
+            if [ $((RANDOM % 2)) -eq 0 ]; then
+              TX=$((WIDTH / 2 - OFFSET - 8))
+            else
+              TX=$((WIDTH / 2 + OFFSET + 2))
+            fi
+
+            TREES_Y+=($TY)
+            TREES_X+=($TX)
+            TREES_LOD+=($LOD)
           done
 
           # ===== РЕНДЕР ДЕРЕВЬЕВ =====
