@@ -46,7 +46,7 @@ jobs:
             done
           done
 
-          # ===== ФУНКЦИЯ РИСОВАНИЯ ОБЪЕКТОВ =====
+          # ===== ФУНКЦИЯ РИСОВАНИЯ ОБЪЕКТА =====
           draw_object() {
             local sy=$1
             local sx=$2
@@ -72,7 +72,34 @@ jobs:
           # ===== ГОРИЗОНТ =====
           HORIZON_Y=$((HEIGHT / 3))
 
-          # ===== ОСНОВНАЯ СЦЕНА =====
+          # ===== РАЗМЕЩЕНИЕ ДЕРЕВЬЕВ (ОДИН РАЗ) =====
+          TREES_Y=()
+          TREES_X=()
+          TREES_LOD=()
+
+          for ((i=0; i<14; i++)); do
+            TY=$((HORIZON_Y + 2 + RANDOM % (HEIGHT - HORIZON_Y - 6)))
+
+            if [ $TY -lt $((HORIZON_Y + 6)) ]; then
+              LOD=0
+            elif [ $TY -lt $((HORIZON_Y + 16)) ]; then
+              LOD=1
+            else
+              LOD=2
+            fi
+
+            if [ $((RANDOM % 2)) -eq 0 ]; then
+              TX=$((WIDTH / 2 - 28))
+            else
+              TX=$((WIDTH / 2 + 22))
+            fi
+
+            TREES_Y+=($TY)
+            TREES_X+=($TX)
+            TREES_LOD+=($LOD)
+          done
+
+          # ===== РЕНДЕР НЕБА + ДОРОГИ =====
           for ((y=1; y<=HEIGHT; y++)); do
 
             ROAD_TOP=6
@@ -91,11 +118,9 @@ jobs:
 
             for ((x=1; x<=WIDTH; x++)); do
 
-              # --- ГОРИЗОНТ ---
               if [ $y -eq $HORIZON_Y ]; then
                 CHAR="─"
 
-              # --- ДОРОГА ---
               elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
                 if [ $x -eq $ROAD_CENTER ] && [ $((y % 2)) -eq 0 ]; then
                   CHAR="│"
@@ -103,7 +128,6 @@ jobs:
                   CHAR="░"
                 fi
 
-              # --- НЕБО ---
               else
                 R=$((RANDOM % 20))
                 if [ $R -eq 0 ]; then
@@ -117,24 +141,15 @@ jobs:
 
               SCREEN[$y,$x]="$CHAR"
             done
+          done
 
-            # ===== ДЕРЕВЬЯ =====
-            if [ $y -gt $HORIZON_Y ] && [ $((RANDOM % 18)) -eq 0 ]; then
-
-              if [ $((RANDOM % 2)) -eq 0 ]; then
-                TX=$((ROAD_LEFT - 6))
-              else
-                TX=$((ROAD_RIGHT + 2))
-              fi
-
-              if [ $y -lt $((HORIZON_Y + 6)) ]; then
-                draw_object $y $TX "${TREE_FAR[@]}"
-              elif [ $y -lt $((HORIZON_Y + 16)) ]; then
-                draw_object $y $TX "${TREE_MID[@]}"
-              else
-                draw_object $y $TX "${TREE_NEAR[@]}"
-              fi
-            fi
+          # ===== РЕНДЕР ДЕРЕВЬЕВ =====
+          for ((i=0; i<${#TREES_Y[@]}; i++)); do
+            case ${TREES_LOD[$i]} in
+              0) draw_object ${TREES_Y[$i]} ${TREES_X[$i]} "${TREE_FAR[@]}" ;;
+              1) draw_object ${TREES_Y[$i]} ${TREES_X[$i]} "${TREE_MID[@]}" ;;
+              2) draw_object ${TREES_Y[$i]} ${TREES_X[$i]} "${TREE_NEAR[@]}" ;;
+            esac
           done
 
           # ===== ВЫВОД =====
@@ -146,4 +161,3 @@ jobs:
             echo "$LINE"
             sleep 0.05
           done
-
