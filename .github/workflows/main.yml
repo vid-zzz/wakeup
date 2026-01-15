@@ -1,16 +1,16 @@
-name: Text Snow Road With Perspective
+name: Text Road With Poles Perspective
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 7 * * *"
-  workflow_dispatch:
 
 jobs:
   render:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Render ASCII scene with real perspective
+      - name: Render ASCII road with poles
         shell: bash
         run: |
           WIDTH=80
@@ -18,26 +18,18 @@ jobs:
 
           # ===== НЕБО =====
           SKY_SMALL="· ˑ ː ˘ ˙"
-          SKY_SNOW="❄ ✼ ❅"
-          SKY_SHINE="⋆ ✧ ✦"
+          SKY_SNOW="❄ ✼"
+          SKY_SHINE="⋆ ✧"
 
-          # ===== ДЕРЕВЬЯ (LOD) =====
-          TREE_FAR=(
-            " ^ "
-          )
+          # ===== ДЕРЕВЬЯ =====
+          TREE_FAR=(" ^ ")
+          TREE_MID=(" /^\\ " "  |  ")
+          TREE_NEAR=("  ###  " " ##### " "  ###  " "   |   ")
 
-          TREE_MID=(
-            " /^\\ "
-            "  |  "
-          )
-
-          TREE_NEAR=(
-            "   ###   "
-            "  #####  "
-            " ####### "
-            "    |    "
-            "    |    "
-          )
+          # ===== СТОЛБЫ =====
+          POLE_FAR=(" | ")
+          POLE_MID=(" | " " | ")
+          POLE_NEAR=(" | " " | " " | " " | ")
 
           # ===== ЭКРАН =====
           declare -A SCREEN
@@ -74,9 +66,8 @@ jobs:
 
           # ===== ДОРОГА + НЕБО =====
           for ((y=1; y<=HEIGHT; y++)); do
-
             ROAD_TOP=6
-            ROAD_BOTTOM=60
+            ROAD_BOTTOM=46
 
             if [ $y -gt $HORIZON_Y ]; then
               T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
@@ -90,19 +81,16 @@ jobs:
             ROAD_CENTER=$(( (ROAD_LEFT + ROAD_RIGHT) / 2 ))
 
             for ((x=1; x<=WIDTH; x++)); do
-
               if [ $y -eq $HORIZON_Y ]; then
                 CHAR="─"
-
               elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
                 if [ $x -eq $ROAD_CENTER ] && [ $((y % 2)) -eq 0 ]; then
                   CHAR="│"
                 else
                   CHAR="░"
                 fi
-
               else
-                R=$((RANDOM % 18))
+                R=$((RANDOM % 16))
                 if [ $R -eq 0 ]; then
                   CHAR=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
                 elif [ $R -eq 1 ]; then
@@ -111,38 +99,74 @@ jobs:
                   CHAR=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
                 fi
               fi
-
               SCREEN[$y,$x]="$CHAR"
             done
           done
 
-          # ===== ГЕНЕРАЦИЯ ДЕРЕВЬЕВ (ОДИН РАЗ) =====
-          TREES_Y=()
-          TREES_X=()
-          TREES_LOD=()
+          # ===== СТОЛБЫ (ПАРАМИ ВДОЛЬ ДОРОГИ) =====
+          POLES_Y=()
+          POLES_X=()
+          POLES_LOD=()
 
-          for ((i=0; i<14; i++)); do
-            TY=$((HORIZON_Y + 2 + RANDOM % (HEIGHT - HORIZON_Y - 8)))
+          for ((y=HORIZON_Y+2; y<=HEIGHT-2; y+=2)); do
+            DEPTH=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
 
-            if [ $TY -lt $((HORIZON_Y + 6)) ]; then
+            OFFSET=$(( DEPTH * 22 / 100 ))
+
+            if [ $DEPTH -lt 35 ]; then
               LOD=0
-            elif [ $TY -lt $((HORIZON_Y + 16)) ]; then
+            elif [ $DEPTH -lt 70 ]; then
               LOD=1
             else
               LOD=2
             fi
 
-            OFFSET=$(( (TY - HORIZON_Y) * 28 / (HEIGHT - HORIZON_Y) ))
+            POLES_Y+=($y)
+            POLES_X+=($((WIDTH/2 - OFFSET - 2)))
+            POLES_LOD+=($LOD)
+
+            POLES_Y+=($y)
+            POLES_X+=($((WIDTH/2 + OFFSET + 1)))
+            POLES_LOD+=($LOD)
+          done
+
+          # ===== ДЕРЕВЬЯ =====
+          TREES_Y=()
+          TREES_X=()
+          TREES_LOD=()
+
+          for ((i=0; i<6; i++)); do
+            TY=$((HORIZON_Y + 3 + RANDOM % (HEIGHT - HORIZON_Y - 6)))
+            DEPTH=$(( (TY - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
+
+            if [ $DEPTH -lt 40 ]; then
+              LOD=0
+            elif [ $DEPTH -lt 70 ]; then
+              LOD=1
+            else
+              LOD=2
+            fi
+
+            OFFSET=$(( DEPTH * 30 / 100 ))
 
             if [ $((RANDOM % 2)) -eq 0 ]; then
-              TX=$((WIDTH / 2 - OFFSET - 8))
+              TX=$((WIDTH/2 - OFFSET - 6))
             else
-              TX=$((WIDTH / 2 + OFFSET + 2))
+              TX=$((WIDTH/2 + OFFSET + 2))
             fi
 
             TREES_Y+=($TY)
             TREES_X+=($TX)
             TREES_LOD+=($LOD)
+          done
+
+          # ===== РЕНДЕР СТОЛБОВ =====
+          for ((i=0; i<${#POLES_Y[@]}; i++)); do
+            case ${POLES_LOD[$i]} in
+              0) draw_object ${POLES_Y[$i]} ${POLES_X[$i]} "${POLE_FAR[@]}" ;;
+              1) draw_object ${POLES_Y[$i]} ${POLES_X[$i]} "${POLE_MID[@]}" ;;
+              2) draw_object ${POLES_Y[$i]} ${POLES_X[$i]} "${POLE_NEAR[@]}" ;;
+            esac
           done
 
           # ===== РЕНДЕР ДЕРЕВЬЕВ =====
