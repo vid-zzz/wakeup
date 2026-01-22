@@ -1,48 +1,98 @@
-name: ASCII Road Engine (Proper Architecture)
+name: Text World Engine — Seasons
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 7 * * *"
+    - cron: "0 7 * * *"   # каждый день
+  workflow_dispatch:
 
 jobs:
-  render:
+  generate:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Render ASCII scene with layers
+      - name: Render text world
         shell: bash
         run: |
-          WIDTH=200
+          ############################
+          # НАСТРОЙКИ ЭКРАНА
+          ############################
+          WIDTH=80
           HEIGHT=20
 
-          # ===== СИМВОЛЫ НЕБА =====
-          SKY_SMALL="· ˑ ː ˘ ˙"
-          SKY_SNOW="❄ ✼"
-          SKY_SHINE="⋆ ✧"
+          ############################
+          # SEED (стабильная случайность)
+          ############################
+          SEED=$(date +%Y%m%d)
+          RANDOM=$SEED
 
-          # ===== ОБЪЕКТЫ =====
+          ############################
+          # ОПРЕДЕЛЕНИЕ СЕЗОНА
+          ############################
+          MONTH=$(date +%m)
+
+          case $MONTH in
+            12|01|02) SEASON="winter" ;;
+            03|04|05) SEASON="spring" ;;
+            06|07|08) SEASON="summer" ;;
+            09|10|11) SEASON="autumn" ;;
+          esac
+
+          ############################
+          # СЕЗОННЫЕ ПАРАМЕТРЫ
+          ############################
+          case $SEASON in
+            winter)
+              SKY_PARTICLE="❄ ✼ ❅"
+              SKY_SMALL="· ˑ ː"
+              TREE_DENSITY=2
+              ;;
+            spring)
+              SKY_PARTICLE="✿ ❀"
+              SKY_SMALL="· ˑ ː"
+              TREE_DENSITY=3
+              ;;
+            summer)
+              SKY_PARTICLE="⋆ ✧"
+              SKY_SMALL="· ˑ"
+              TREE_DENSITY=4
+              ;;
+            autumn)
+              SKY_PARTICLE="✻ ❁"
+              SKY_SMALL="· ˑ ː"
+              TREE_DENSITY=3
+              ;;
+          esac
+
+          ############################
+          # СПРАЙТЫ ДЕРЕВЬЕВ (LOD)
+          ############################
           TREE_FAR=(" ^ ")
-          TREE_MID=(" /^\\ " "  |  ")
-          TREE_NEAR=("  ###  " " ##### " "  ###  " "   |   ")
 
-          POLE_FAR=(" | ")
-          POLE_MID=(" | " " | ")
-          POLE_NEAR=(" | " " | " " | ")
+          TREE_MID=(
+            " ^ "
+            "/|\\"
+          )
 
-          # ===== БУФЕРЫ =====
-          declare -A SKY
-          declare -A WORLD
-          declare -A FINAL
+          TREE_NEAR=(
+            "  ^  "
+            " /***\\ "
+            "/*****\\"
+            "   |   "
+          )
 
+          ############################
+          # ЭКРАННЫЙ БУФЕР
+          ############################
+          declare -A SCREEN
           for ((y=1; y<=HEIGHT; y++)); do
             for ((x=1; x<=WIDTH; x++)); do
-              SKY[$y,$x]=" "
-              WORLD[$y,$x]=" "
-              FINAL[$y,$x]=" "
+              SCREEN[$y,$x]=" "
             done
           done
 
+          ############################
+          # ФУНКЦИЯ РИСОВАНИЯ СПРАЙТА
+          ############################
           draw_object() {
             local sy=$1
             local sx=$2
@@ -58,116 +108,101 @@ jobs:
                   px=$((sx + xx))
                   if [ $py -ge 1 ] && [ $py -le $HEIGHT ] && \
                      [ $px -ge 1 ] && [ $px -le $WIDTH ]; then
-                    WORLD[$py,$px]="$char"
+                    SCREEN[$py,$px]="$char"
                   fi
                 fi
               done
             done
           }
 
-          # ===== ГОРИЗОНТ =====
+          ############################
+          # ГОРИЗОНТ И ДОРОГА
+          ############################
           HORIZON_Y=$((HEIGHT / 3))
+          ROAD_TOP=6
+          ROAD_BOTTOM=40
 
-          # ===== НЕБО + СНЕГ (SKY) =====
+          ############################
+          # ФОН + ДОРОГА
+          ############################
           for ((y=1; y<=HEIGHT; y++)); do
+
+            if [ $y -gt $HORIZON_Y ]; then
+              T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y) ))
+              ROAD_WIDTH=$(( ROAD_TOP + (ROAD_BOTTOM - ROAD_TOP) * T / 100 ))
+            else
+              ROAD_WIDTH=$ROAD_TOP
+            fi
+
+            ROAD_LEFT=$(( (WIDTH - ROAD_WIDTH) / 2 ))
+            ROAD_RIGHT=$(( ROAD_LEFT + ROAD_WIDTH ))
+            ROAD_CENTER=$(( (ROAD_LEFT + ROAD_RIGHT) / 2 ))
+
             for ((x=1; x<=WIDTH; x++)); do
-              if [ $y -lt $HORIZON_Y ]; then
-                R=$((RANDOM % 18))
-                if [ $R -eq 0 ]; then
-                  SKY[$y,$x]=$(echo "$SKY_SNOW" | tr " " "\n" | shuf -n 1)
-                elif [ $R -eq 1 ]; then
-                  SKY[$y,$x]=$(echo "$SKY_SHINE" | tr " " "\n" | shuf -n 1)
+
+              # ГОРИЗОНТ
+              if [ $y -eq $HORIZON_Y ]; then
+                CHAR="─"
+
+              # ДОРОГА
+              elif [ $y -gt $HORIZON_Y ] && [ $x -ge $ROAD_LEFT ] && [ $x -le $ROAD_RIGHT ]; then
+                if [ $x -eq $ROAD_CENTER ] && [ $((y % 2)) -eq 0 ]; then
+                  CHAR="│"
                 else
-                  SKY[$y,$x]=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
+                  CHAR="░"
+                fi
+
+              # НЕБО
+              else
+                R=$((RANDOM % 10))
+                if [ $R -eq 0 ]; then
+                  CHAR=$(echo "$SKY_PARTICLE" | tr " " "\n" | shuf -n 1)
+                else
+                  CHAR=$(echo "$SKY_SMALL" | tr " " "\n" | shuf -n 1)
                 fi
               fi
+
+              SCREEN[$y,$x]="$CHAR"
             done
           done
 
-          # ===== ДОРОГА (WORLD) =====
-          for ((y=HORIZON_Y; y<=HEIGHT; y++)); do
-            ROAD_TOP=6
-            ROAD_BOTTOM=50
+          ############################
+          # ДЕРЕВЬЯ ВДОЛЬ ДОРОГИ
+          ############################
+          TREE_COUNT=$((HEIGHT / 2 + RANDOM % TREE_DENSITY))
 
-            T=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y + 1) ))
-            ROAD_WIDTH=$(( ROAD_TOP + (ROAD_BOTTOM - ROAD_TOP) * T / 100 ))
+          for ((i=0; i<TREE_COUNT; i++)); do
+            TY=$((HORIZON_Y + 2 + RANDOM % (HEIGHT - HORIZON_Y - 5)))
 
-            LEFT=$(( (WIDTH - ROAD_WIDTH) / 2 ))
-            RIGHT=$(( LEFT + ROAD_WIDTH ))
-            CENTER=$(( (LEFT + RIGHT) / 2 ))
-
-            for ((x=LEFT; x<=RIGHT; x++)); do
-              if [ $x -eq $CENTER ] && [ $((y % 2)) -eq 0 ]; then
-                WORLD[$y,$x]="│"
-              else
-                WORLD[$y,$x]="░"
-              fi
-            done
-          done
-
-          # ===== СТОЛБЫ =====
-          for ((y=HORIZON_Y+2; y<=HEIGHT-1; y+=2)); do
-            DEPTH=$(( (y - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y + 1) ))
-            OFFSET=$(( DEPTH * 20 / 100 ))
-
-            if [ $DEPTH -lt 40 ]; then
-              LOD=0
-            elif [ $DEPTH -lt 75 ]; then
-              LOD=1
-            else
-              LOD=2
-            fi
-
-            case $LOD in
-              0) SPRITE=("${POLE_FAR[@]}") ;;
-              1) SPRITE=("${POLE_MID[@]}") ;;
-              2) SPRITE=("${POLE_NEAR[@]}") ;;
-            esac
-
-            draw_object $y $((WIDTH/2 - OFFSET - 2)) "${SPRITE[@]}"
-            draw_object $y $((WIDTH/2 + OFFSET + 1)) "${SPRITE[@]}"
-          done
-
-          # ===== ДЕРЕВЬЯ =====
-          for ((i=0; i<5; i++)); do
-            TY=$((HORIZON_Y + 3 + RANDOM % (HEIGHT - HORIZON_Y - 4)))
-            DEPTH=$(( (TY - HORIZON_Y) * 100 / (HEIGHT - HORIZON_Y + 1) ))
-            OFFSET=$(( DEPTH * 28 / 100 ))
-
-            if [ $DEPTH -lt 40 ]; then
-              SPRITE=("${TREE_FAR[@]}")
-            elif [ $DEPTH -lt 70 ]; then
-              SPRITE=("${TREE_MID[@]}")
-            else
-              SPRITE=("${TREE_NEAR[@]}")
-            fi
+            JITTER=$((RANDOM % 3 - 1))
+            TY=$((TY + JITTER))
 
             if [ $((RANDOM % 2)) -eq 0 ]; then
-              TX=$((WIDTH/2 - OFFSET - 6))
+              TX=$((ROAD_LEFT - 6))
             else
-              TX=$((WIDTH/2 + OFFSET + 2))
+              TX=$((ROAD_RIGHT + 2))
             fi
 
-            draw_object $TY $TX "${SPRITE[@]}"
+            if [ $TY -lt $((HORIZON_Y + 5)) ]; then
+              draw_object $TY $TX "${TREE_FAR[@]}"
+            elif [ $TY -lt $((HORIZON_Y + 10)) ]; then
+              draw_object $TY $TX "${TREE_MID[@]}"
+            else
+              draw_object $TY $TX "${TREE_NEAR[@]}"
+            fi
           done
 
-          # ===== КОМПОЗИТ =====
-          for ((y=1; y<=HEIGHT; y++)); do
-            for ((x=1; x<=WIDTH; x++)); do
-              if [ "${WORLD[$y,$x]}" != " " ]; then
-                FINAL[$y,$x]="${WORLD[$y,$x]}"
-              else
-                FINAL[$y,$x]="${SKY[$y,$x]}"
-              fi
-            done
-          done
+          ############################
+          # ВЫВОД
+          ############################
+          echo ""
+          echo "SEASON: $SEASON | SEED: $SEED"
+          echo ""
 
-          # ===== ВЫВОД =====
           for ((y=1; y<=HEIGHT; y++)); do
             LINE=""
             for ((x=1; x<=WIDTH; x++)); do
-              LINE+="${FINAL[$y,$x]}"
+              LINE+="${SCREEN[$y,$x]}"
             done
             echo "$LINE"
-            sleep 0.05
           done
