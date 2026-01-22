@@ -13,7 +13,7 @@ jobs:
       - name: Render ASCII scene with layers
         shell: bash
         run: |
-          WIDTH=80
+          WIDTH=200
           HEIGHT=20
 
           # ===== СИМВОЛЫ НЕБА =====
